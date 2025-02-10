@@ -21,30 +21,24 @@ TaggedParameter parse_tagged_parameter(const uint8_t* data) {
 // Radiotap Header에서 FCS 플래그 제거하는 함수
 void remove_fcs_flag(std::vector<uint8_t>& packet) {
     if (packet.size() < sizeof(RadiotapHeader)) {
-        std::cerr << "Packet too small to contain Radiotap Header!" << std::endl;
         return;
     }
 
     // Radiotap Header 포인터 설정
-    RadiotapHeader* radiotap = reinterpret_cast<RadiotapHeader*>(packet.data());
+    // RadiotapHeader* radiotap = reinterpret_cast<RadiotapHeader*>(packet.data());
 
     // 현재 Flags 값을 가져옴
     uint8_t* flags_ptr = packet.data() + sizeof(RadiotapHeader) - 1; // Flags 위치
 
     // FCS 포함 플래그(0x10) 확인
     if (*flags_ptr & 0x10) {
-        std::cout << "FCS Flag is set, removing it..." << std::endl;
-        
         // FCS 플래그 비활성화
         *flags_ptr &= ~0x10;
 
         // 패킷에서 마지막 4바이트(FCS) 제거
         if (packet.size() > 4) {
             packet.resize(packet.size() - 4);
-            std::cout << "FCS removed from the packet." << std::endl;
         }
-    } else {
-        std::cout << "FCS Flag is NOT set, no change needed." << std::endl;
     }
 }
 
@@ -69,9 +63,6 @@ std::vector<uint8_t> insert_new_tag(const uint8_t* tagged_params, size_t params_
         }
         
         if (!inserted && !tag_exists && curr_tag > new_tag_number) {
-            std::cout << "new_tag in here " << std::endl;
-            // 현재 태그 정보 출력
-        std::cout << "Tag Number: 37, Length: 3" << std::endl;
             updated.push_back(new_tag_number);
             updated.push_back(new_tag_length);
             updated.insert(updated.end(), new_tag_value, new_tag_value + new_tag_length);
@@ -83,9 +74,6 @@ std::vector<uint8_t> insert_new_tag(const uint8_t* tagged_params, size_t params_
         if (offset + 2 + curr_len > params_len) break;
         updated.insert(updated.end(), tagged_params + offset + 2, tagged_params + offset + 2 + curr_len);
         offset += 2 + curr_len;
-        // 현재 태그 정보 출력
-        std::cout << "Tag Number: " << static_cast<int>(curr_tag)
-                << ", Length: " << static_cast<int>(curr_len) << std::endl;
     }
 
     if (!inserted && !tag_exists) {
@@ -141,11 +129,7 @@ int main(int argc, char *argv[]) {
 
         if (memcmp(frame->address3.addr, ap_mac.addr, 6) != 0) {
             continue;
-        }
-
-        if (argc == 4 && memcmp(frame->address1.addr, station_mac.addr, 6) != 0) {
-            continue;
-        }        
+        }       
 
         const uint8_t* tagged_params = reinterpret_cast<const uint8_t*>(frame) + sizeof(Frame80211);
         size_t fixed_para_len = 12;
@@ -154,9 +138,6 @@ int main(int argc, char *argv[]) {
         // Start Insert
         std::vector<uint8_t> updated_params = insert_new_tag(tagged_params + fixed_para_len, tagged_len);
         std::vector<uint8_t> modified_packet(packet, packet + header->caplen);
-
-        // RadiotapHeader* mod_radiotap = reinterpret_cast<RadiotapHeader*>(modified_packet.data());
-        // mod_radiotap->length -= 8;
 
         size_t tag_offset = radiotap->length + sizeof(Frame80211) + fixed_para_len;
         modified_packet.erase(modified_packet.begin() + tag_offset, modified_packet.end());
